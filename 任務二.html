@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任務二：情緒偵探事務所 (Mac版)</title>
+    <!-- 引入 Tailwind CSS (快速排版) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Mac 字體優化 */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif; }
+        
+        /* 動畫設定 */
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .slide-in { animation: slideIn 0.5s ease-out forwards; }
+        .zoom-in { animation: zoomIn 0.3s ease-out forwards; }
+        .pulse-slow { animation: pulse 3s infinite; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* 隱藏捲軸 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-200 flex justify-center items-center p-4 md:p-8 selection:bg-cyan-500 selection:text-white">
+
+    <!-- 主裝置容器 -->
+    <div class="w-full max-w-4xl bg-slate-800 rounded-3xl border-4 border-slate-700 shadow-2xl overflow-hidden relative flex flex-col min-h-[600px]">
+        
+        <!-- 頂部狀態列 -->
+        <div class="bg-slate-900 p-4 border-b border-slate-700 flex justify-between items-center z-10">
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                <span class="ml-4 font-mono text-cyan-400 font-bold tracking-widest text-sm md:text-base">
+                    DETECTIVE_OS v2.0
+                </span>
+            </div>
+            <div class="flex items-center gap-2 text-xs md:text-sm font-bold text-slate-400">
+                 <!-- ID Icon -->
+                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12C2 12 5 2 12 2C19 2 22 12 22 12"/><path d="M12 2V12"/><path d="M12 22C12 22 19 12 19 12"/><path d="M12 22C12 22 5 12 5 12"/><path d="M12 22V12"/></svg>
+                 <span>ID: STUDENT_01</span>
+            </div>
+        </div>
+
+        <!-- 動態內容區 -->
+        <div id="game-content" class="flex-1 p-6 md:p-10 relative overflow-hidden">
+            <!-- 這裡的內容會由 JS 替換 -->
+        </div>
+
+        <!-- 背景網格 -->
+        <div class="absolute inset-0 opacity-5 pointer-events-none z-0" 
+             style="background-image: radial-gradient(#22d3ee 1px, transparent 1px); background-size: 20px 20px;">
+        </div>
+
+        <!-- 提示訊息 (Toast) -->
+        <div id="toast" class="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 z-50 min-w-[300px] justify-center pointer-events-none">
+            <div id="toast-icon"></div>
+            <span id="toast-msg" class="font-bold"></span>
+        </div>
+    </div>
+
+    <!-- JavaScript 邏輯 -->
+    <script>
+        // --- 1. 資料與狀態 ---
+        let state = {
+            stage: 'intro', // intro, evidence, motive, scan, tactics, report
+            matchedEvidence: false,
+            selectedMotive: null,
+            bodySymptoms: [],
+            selectedTactics: []
+        };
+
+        // SVG Icons (向量圖示)
+        const icons = {
+            search: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+            siren: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/><path d="M12 3a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><circle cx="12" cy="14" r="3"/></svg>`,
+            arrowRight: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>`,
+            check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+            alert: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`,
+            fileText: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>`,
+            activity: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
+            shield: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+            refresh: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>`
+        };
+
+        // --- 2. 核心功能 ---
+
+        function showFeedback(type, message) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-msg');
+            
+            toast.className = `absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 z-50 min-w-[300px] justify-center ${type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'} opacity-100 translate-y-0`;
+            icon.innerHTML = type === 'success' ? icons.check : icons.alert;
+            msg.textContent = message;
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-10');
+            }, 2500);
+        }
+
+        function setStage(newStage) {
+            state.stage = newStage;
+            render();
+        }
+
+        function handleEvidenceMatch(item) {
+            if (item === 'tire') {
+                state.matchedEvidence = true;
+                render(); // Re-render to show success state
+                showFeedback('success', '配對成功！失落的感覺就像沒氣的輪胎，動彈不得。');
+                setTimeout(() => setStage('motive'), 2000);
+            } else {
+                showFeedback('error', '再想一下... 這個比喻好像不太符合「失落」那種無力的感覺？');
+            }
+        }
+
+        function handleMotiveSubmit() {
+            if (state.selectedMotive === 'love') {
+                showFeedback('success', '分析正確！小樂在乎的是媽媽的愛與公平。');
+                setTimeout(() => setStage('scan'), 2000);
+            } else {
+                showFeedback('error', '真的是因為玩具嗎？還是有更深層的原因呢？');
+            }
+        }
+
+        function toggleBodySymptom(id) {
+            const index = state.bodySymptoms.indexOf(id);
+            if (index > -1) {
+                state.bodySymptoms.splice(index, 1);
+            } else {
+                state.bodySymptoms.push(id);
+            }
+            render();
+        }
+
+        function handleScanSubmit() {
+            const isCorrect = state.bodySymptoms.includes('heavy') && state.bodySymptoms.includes('sore') && !state.bodySymptoms.includes('hot');
+            
+            if (isCorrect) {
+                showFeedback('success', '掃描完成！這些都是失落時常見的身體反應。');
+                setTimeout(() => setStage('tactics'), 2000);
+            } else if (state.bodySymptoms.includes('hot')) {
+                showFeedback('error', '「身體像火在燒」通常是「生氣」喔！失落通常比較像沒力氣。');
+            } else {
+                showFeedback('error', '還有其他的反應喔！再仔細感覺一下身體... (提示：眼睛、胸口)');
+            }
+        }
+
+        function toggleTactic(id) {
+            const index = state.selectedTactics.indexOf(id);
+            if (index > -1) {
+                state.selectedTactics.splice(index, 1);
+            } else {
+                state.selectedTactics.push(id);
+            }
+            render();
+        }
+
+        function handleTacticsSubmit() {
+            const hasBad = state.selectedTactics.includes('pretend');
+            const hasGood = state.selectedTactics.includes('hide') || state.selectedTactics.includes('talk') || state.selectedTactics.includes('cry');
+            
+            if (!hasBad && hasGood) {
+                showFeedback('success', '戰術制定成功！接納情緒、尋求支持都是好方法。');
+                setTimeout(() => setStage('report'), 2000);
+            } else if (hasBad) {
+                showFeedback('error', '「假裝沒事」可能會讓心裡的雨下得更久喔... 試著面對它吧！');
+            } else {
+                showFeedback('error', '請至少選擇一種能讓心裡舒服一點的方法。');
+            }
+        }
+
+        function restartGame() {
+            state = {
+                stage: 'intro',
+                matchedEvidence: false,
+                selectedMotive: null,
+                bodySymptoms: [],
+                selectedTactics: []
+            };
+            render();
+        }
+
+        // --- 3. 渲染視圖 (Render) ---
+
+        function render() {
+            const container = document.getElementById('game-content');
+            container.innerHTML = ''; // 清空
+
+            if (state.stage === 'intro') renderIntro(container);
+            else if (state.stage === 'evidence') renderEvidence(container);
+            else if (state.stage === 'motive') renderMotive(container);
+            else if (state.stage === 'scan') renderScan(container);
+            else if (state.stage === 'tactics') renderTactics(container);
+            else if (state.stage === 'report') renderReport(container);
+        }
+
+        function renderIntro(container) {
+            const div = document.createElement('div');
+            div.className = 'h-full flex flex-col items-center justify-center text-center zoom-in';
+            div.innerHTML = `
+                <div class="w-24 h-24 bg-cyan-900/30 rounded-full flex items-center justify-center mb-6 border-2 border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)] text-cyan-400">
+                    ${icons.search}
+                </div>
+                <h1 class="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">任務二：偵探報告</h1>
+                <p class="text-slate-400 text-lg mb-8 max-w-lg">有一樁「情緒案件」發生了。根據你剛剛收集到的線索，我們需要你協助分析現場，還原真相。</p>
+                <button onclick="setStage('evidence')" class="group px-8 py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-cyan-500/25 flex items-center gap-2">
+                    ${icons.siren} 開始調查
+                </button>
+            `;
+            container.appendChild(div);
+        }
+
+        function renderEvidence(container) {
+            const div = document.createElement('div');
+            div.className = 'h-full flex flex-col slide-in';
+            
+            // 左側卡片
+            const leftCard = `
+                <div class="w-full md:w-1/3">
+                    <div class="w-full p-6 bg-slate-700/50 border-2 border-blue-400 rounded-2xl flex flex-col items-center gap-3 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                        <div class="text-4xl">💔🌧️</div>
+                        <div class="font-bold text-lg text-blue-200">失落的心情</div>
+                        <div class="text-xs text-blue-300/50">EVIDENCE A</div>
+                    </div>
+                    <div class="hidden md:flex justify-center mt-2"><div class="w-1 h-8 bg-blue-400/30"></div></div>
+                </div>
+            `;
+
+            // 右側選項
+            const options = [
+                { id: 'ball', text: '充滿氣的籃球', icon: '🏀' },
+                { id: 'tire', text: '漏氣的輪胎', icon: '🚙' },
+                { id: 'balloon', text: '飄走的氣球', icon: '🎈' }
+            ].map(item => {
+                const isMatch = state.matchedEvidence && item.id === 'tire';
+                const baseClass = "w-full p-4 rounded-xl border-2 text-left flex items-center gap-4 transition-all mb-4";
+                const activeClass = isMatch ? "bg-green-900/30 border-green-500 text-green-100 shadow-[0_0_15px_rgba(34,197,94,0.3)]" : "bg-slate-800 border-slate-600 hover:border-cyan-400 hover:bg-slate-700";
+                
+                return `
+                    <button onclick="handleEvidenceMatch('${item.id}')" ${state.matchedEvidence ? 'disabled' : ''} class="${baseClass} ${activeClass}">
+                        <span class="text-2xl">${item.icon}</span>
+                        <span class="font-bold">${item.text}</span>
+                        ${isMatch ? `<span class="ml-auto text-green-400">${icons.check}</span>` : ''}
+                    </button>
+                `;
+            }).join('');
+
+            div.innerHTML = `
+                <div class="mb-6 border-l-4 border-cyan-500 pl-4">
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">${icons.search} 1. 現場指認（定義）</h2>
+                    <p class="text-slate-400 text-sm">請將左側的「心情」與右側正確的「狀態」連線。</p>
+                </div>
+                <div class="flex-1 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-20">
+                    ${leftCard}
+                    <div class="hidden md:block text-slate-600">${icons.arrowRight}</div>
+                    <div class="w-full md:w-1/3">${options}</div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function renderMotive(container) {
+            const div = document.createElement('div');
+            div.className = 'h-full flex flex-col slide-in';
+
+            const opts = [
+                { id: 'toy', title: 'A. 是，玩具很重要', desc: '因為那個玩具非常昂貴，不能弄丟。' },
+                { id: 'love', title: 'B. 不是，是因為感覺失去了愛', desc: '她覺得失去了媽媽的愛和公平，心裡覺得空空的。' }
+            ].map(item => {
+                const isSelected = state.selectedMotive === item.id;
+                const style = isSelected 
+                    ? (item.id === 'toy' ? 'border-red-400 bg-red-900/20' : 'border-cyan-400 bg-cyan-900/20 shadow-[0_0_15px_rgba(34,211,238,0.1)]')
+                    : 'border-slate-600 bg-slate-800 hover:bg-slate-700';
+                
+                return `
+                    <button onclick="state.selectedMotive='${item.id}'; render();" class="p-5 rounded-xl border-2 text-left transition-all w-full mb-4 ${style}">
+                        <div class="font-bold text-lg mb-1">${item.title}</div>
+                        <div class="text-sm text-slate-400">${item.desc}</div>
+                    </button>
+                `;
+            }).join('');
+
+            div.innerHTML = `
+                <div class="mb-6 border-l-4 border-cyan-500 pl-4">
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">${icons.fileText} 2. 證詞分析（原因）</h2>
+                    <p class="text-slate-400 text-sm">深入調查小樂的內心，她為什麼會感到失落？</p>
+                </div>
+                <div class="flex-1 flex flex-col md:flex-row items-stretch gap-6">
+                    <div class="md:w-1/3 bg-slate-800 border border-slate-600 rounded-2xl p-6 flex flex-col items-center text-center">
+                        <div class="w-24 h-24 bg-purple-900/50 rounded-full border-2 border-purple-400 mb-4 flex items-center justify-center text-3xl">👧</div>
+                        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 w-full">
+                            <p class="text-purple-200 font-bold mb-2">偵探提問：</p>
+                            <p class="text-slate-300 text-sm leading-relaxed">「小樂是因為『玩具被搶走』這個物品本身的損失才感到這麼難過嗎？」</p>
+                        </div>
+                    </div>
+                    <div class="flex-1 flex flex-col justify-center">
+                        ${opts}
+                        <button onclick="handleMotiveSubmit()" ${!state.selectedMotive ? 'disabled' : ''} class="mt-4 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-xl transition-all">
+                            提交分析報告
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function renderScan(container) {
+            const div = document.createElement('div');
+            div.className = 'h-full flex flex-col slide-in';
+
+            const opts = [
+                { id: 'heavy', text: '身體重重的（像穿著濕衣服）', icon: '🧥' },
+                { id: 'hot', text: '身體熱熱的（像火在燒）', icon: '🔥' },
+                { id: 'tight', text: '胸口悶悶的（像塞了大石頭）', icon: '🪨' },
+                { id: 'sore', text: '眼睛酸酸的（眼淚快掉下來）', icon: '🥺' }
+            ].map(item => {
+                const isSelected = state.bodySymptoms.includes(item.id);
+                const style = isSelected ? 'bg-cyan-900/40 border-cyan-400 text-cyan-100' : 'bg-slate-800 border-slate-600 hover:bg-slate-700';
+                const checkStyle = isSelected ? 'border-cyan-400 bg-cyan-500' : 'border-slate-500';
+                
+                return `
+                    <button onclick="toggleBodySymptom('${item.id}')" class="p-4 rounded-xl border-2 text-left flex items-center gap-4 transition-all ${style}">
+                        <div class="w-6 h-6 rounded border-2 flex items-center justify-center ${checkStyle}">
+                            ${isSelected ? `<span class="text-white">${icons.check}</span>` : ''}
+                        </div>
+                        <span class="text-2xl">${item.icon}</span>
+                        <span class="font-bold">${item.text}</span>
+                    </button>
+                `;
+            }).join('');
+
+            // 簡化的人體 SVG
+            const bodySvg = `
+                <svg viewBox="0 0 100 200" class="w-full h-full drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
+                    <path d="M50 10 C50 10 35 10 35 25 C35 35 40 40 40 40 L30 50 L20 100 L30 110 L40 60 L40 120 L30 190 L45 190 L45 130 L55 130 L55 190 L70 190 L60 120 L60 60 L70 110 L80 100 L70 50 L60 40 C60 40 65 35 65 25 C65 10 50 10 50 10" fill="none" stroke="#22d3ee" stroke-width="2" />
+                    ${state.bodySymptoms.includes('sore') ? '<circle cx="43" cy="20" r="2" fill="#ef4444" class="pulse-slow" /><circle cx="57" cy="20" r="2" fill="#ef4444" class="pulse-slow" />' : ''}
+                    ${state.bodySymptoms.includes('tight') ? '<circle cx="50" cy="55" r="8" fill="#ef4444" opacity="0.5" />' : ''}
+                    ${state.bodySymptoms.includes('heavy') ? '<rect x="30" y="50" width="40" height="80" fill="#3b82f6" opacity="0.2" />' : ''}
+                    ${state.bodySymptoms.includes('hot') ? '<rect x="30" y="50" width="40" height="80" fill="#ef4444" opacity="0.2" />' : ''}
+                </svg>
+            `;
+
+            div.innerHTML = `
+                <div class="mb-4 border-l-4 border-cyan-500 pl-4">
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">${icons.activity} 3. 身體掃描機（反應）</h2>
+                    <p class="text-slate-400 text-sm">啟動生物掃描。請勾選出「失落」時會有的身體反應（可複選）。</p>
+                </div>
+                <div class="flex-1 flex flex-col md:flex-row items-center gap-8">
+                    <div class="relative w-48 h-96 flex-shrink-0">
+                        <div class="absolute inset-0 bg-cyan-500/10 rounded-full blur-xl animate-pulse"></div>
+                        ${bodySvg}
+                    </div>
+                    <div class="flex-1 grid grid-cols-1 gap-3 w-full">
+                        ${opts}
+                        <button onclick="handleScanSubmit()" ${state.bodySymptoms.length === 0 ? 'disabled' : ''} class="mt-4 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-xl transition-all">
+                            完成掃描
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function renderTactics(container) {
+            const div = document.createElement('div');
+            div.className = 'h-full flex flex-col slide-in';
+
+            const opts = [
+                { id: 'pretend', text: '假裝沒事，趕快去讀書', icon: '📚', type: 'bad' },
+                { id: 'hide', text: '找個舒服的角落躲一下', icon: '🧸', type: 'good' },
+                { id: 'talk', text: '找信任的人說說話', icon: '🗣️', type: 'good' },
+                { id: 'cry', text: '大哭一場也沒關係', icon: '😭', type: 'good' }
+            ].map(item => {
+                const isSelected = state.selectedTactics.includes(item.id);
+                const style = isSelected ? 'bg-purple-900/40 border-purple-400 text-purple-100 shadow-[0_0_15px_rgba(192,132,252,0.2)]' : 'bg-slate-800 border-slate-600 hover:bg-slate-700';
+                const checkStyle = isSelected ? 'border-purple-400 bg-purple-500' : 'border-slate-500';
+                
+                return `
+                    <button onclick="toggleTactic('${item.id}')" class="p-6 rounded-2xl border-2 text-left flex items-start gap-4 transition-all hover:scale-105 active:scale-95 ${style}">
+                         <div class="mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${checkStyle}">
+                           ${isSelected ? `<span class="text-white">${icons.check}</span>` : ''}
+                         </div>
+                         <div>
+                            <div class="text-3xl mb-2">${item.icon}</div>
+                            <div class="font-bold text-lg">${item.text}</div>
+                         </div>
+                    </button>
+                `;
+            }).join('');
+
+            div.innerHTML = `
+                 <div class="mb-6 border-l-4 border-cyan-500 pl-4">
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">${icons.shield} 4. 絕招演練（解決問題）</h2>
+                    <p class="text-slate-400 text-sm">如果心裡下了藍色的雨，文章教我們可以怎麼做？（可複選）</p>
+                </div>
+                <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${opts}
+                </div>
+                 <button onclick="handleTacticsSubmit()" ${state.selectedTactics.length === 0 ? 'disabled' : ''} class="mt-6 w-full py-4 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white font-bold rounded-xl transition-all shadow-lg text-lg flex items-center justify-center gap-2">
+                    ${icons.shield} 執行戰術
+                </button>
+            `;
+            container.appendChild(div);
+        }
+
+        function renderReport(container) {
+            const div = document.createElement('div');
+            div.className = 'h-full flex flex-col items-center justify-center text-center zoom-in';
+
+            div.innerHTML = `
+                <div class="w-32 h-32 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(34,197,94,0.5)]">
+                    <div class="text-white scale-[2]">${icons.check}</div>
+                </div>
+                <h1 class="text-4xl font-black text-white mb-4">案件順利偵破！</h1>
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-600 max-w-lg w-full mb-8">
+                    <h3 class="text-cyan-400 font-bold mb-4 uppercase tracking-widest border-b border-slate-700 pb-2">Case Summary</h3>
+                    <ul class="text-left space-y-3 text-slate-300">
+                        <li class="flex gap-2"><span class="text-green-500 mt-1">${icons.check}</span> <span>定義：失落就像「漏氣的輪胎」，讓人沒力氣。</span></li>
+                        <li class="flex gap-2"><span class="text-green-500 mt-1">${icons.check}</span> <span>原因：不只是玩具，而是感覺失去了「愛」。</span></li>
+                        <li class="flex gap-2"><span class="text-green-500 mt-1">${icons.check}</span> <span>反應：身體會重重的、眼睛酸酸的、胸口悶悶的。</span></li>
+                        <li class="flex gap-2"><span class="text-green-500 mt-1">${icons.check}</span> <span>對策：躲一下、說說話、哭一場，都是很好的方法！</span></li>
+                    </ul>
+                </div>
+                <button onclick="restartGame()" class="px-8 py-3 text-slate-400 hover:text-white font-bold transition-colors flex items-center gap-2">
+                    ${icons.refresh} 重啟調查
+                </button>
+            `;
+            container.appendChild(div);
+        }
+
+        // --- 4. 啟動 ---
+        render();
+
+    </script>
+</body>
+</html>
