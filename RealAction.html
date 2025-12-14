@@ -17,23 +17,63 @@
         /* Mac 字體優化 */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif; }
         
-        /* 列印專用樣式 (Print CSS) */
+        /* --- 列印專用樣式 (Print CSS) --- */
         @media print {
             @page { size: A4; margin: 1cm; }
             body { background-color: white !important; color: black !important; -webkit-print-color-adjust: exact; }
+            
             .no-print { display: none !important; }
             .print-only { display: block !important; }
             .print-border { border: 2px solid #000 !important; box-shadow: none !important; }
             .print-bg-none { background: none !important; }
             .print-text-black { color: black !important; }
-            input, textarea { border: none !important; border-bottom: 1px solid #ccc !important; background: transparent !important; color: black !important; }
-            .canvas-container { border: 1px solid #000 !important; }
             
-            /* 列印時隱藏沒選中的按鈕 */
+            input, textarea { 
+                border: none !important; 
+                border-bottom: 1px solid #ccc !important; 
+                background: transparent !important; 
+                color: black !important; 
+            }
+            
             .print-hidden-if-inactive { display: none !important; }
         }
 
-        /* 螢幕顯示樣式 */
+        /* --- 預覽模式樣式 (模擬列印效果) --- */
+        .preview-mode {
+            background-color: white !important;
+            color: black !important;
+            min-height: 100vh;
+        }
+        .preview-mode .no-print { display: none !important; }
+        
+        /* 強制顯示預覽控制列 */
+        .preview-mode .preview-controls { display: flex !important; }
+
+        .preview-mode .print-only { display: block !important; }
+        .preview-mode .print-border { border: 2px solid #000 !important; box-shadow: none !important; }
+        .preview-mode .print-bg-none { background: none !important; }
+        .preview-mode .print-text-black { color: black !important; }
+        .preview-mode .neon-box { box-shadow: none !important; border: none !important; }
+        
+        /* 預覽模式下的輸入框樣式 (強制為黑色，去除預設 disabled 灰色樣式) */
+        .preview-mode input, .preview-mode textarea { 
+            border: none !important; 
+            border-bottom: 1px solid #ccc !important; 
+            background: transparent !important; 
+            color: black !important; 
+            opacity: 1 !important; /* 防止 disabled 變透明 */
+            -webkit-text-fill-color: black !important; /* 修正 Safari/Chrome disabled 文字顏色 */
+            cursor: default !important;
+        }
+        
+        /* 預覽模式下隱藏沒選中的選項 */
+        .preview-mode .print-hidden-if-inactive { display: none !important; }
+        
+        /* 隱藏導演小抄 */
+        .preview-mode .director-notes { display: none !important; }
+
+
+        /* --- 一般螢幕顯示樣式 --- */
         .print-only { display: none; }
         .neon-box {
             box-shadow: 0 0 10px rgba(34, 211, 238, 0.3), inset 0 0 20px rgba(34, 211, 238, 0.1);
@@ -43,21 +83,22 @@
         }
     </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen">
+<body class="min-h-screen">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
         // --- 元件：星星評分 ---
-        const StarRating = ({ value, onChange, color = "text-yellow-400" }) => {
+        const StarRating = ({ value, onChange, color = "text-yellow-400", readOnly = false }) => {
             return (
                 <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map((star) => (
                         <button
                             key={star}
-                            onClick={() => onChange(star)}
-                            className={`text-2xl transition-transform hover:scale-110 focus:outline-none ${star <= value ? color : "text-slate-600"}`}
+                            onClick={() => !readOnly && onChange(star)}
+                            disabled={readOnly}
+                            className={`text-2xl transition-transform ${!readOnly ? 'hover:scale-110 focus:outline-none' : 'cursor-default'} ${star <= value ? color : "text-slate-600"}`}
                         >
                             ★
                         </button>
@@ -67,7 +108,7 @@
         };
 
         // --- 元件：繪圖板 ---
-        const DrawingCanvas = ({ onSave }) => {
+        const DrawingCanvas = ({ onSave, readOnly = false }) => {
             const canvasRef = useRef(null);
             const [isDrawing, setIsDrawing] = useState(false);
 
@@ -86,16 +127,19 @@
             const getPos = (e) => {
                 const canvas = canvasRef.current;
                 const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
                 return {
-                    x: clientX - rect.left,
-                    y: clientY - rect.top
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
                 };
             };
 
             const startDrawing = (e) => {
-                e.preventDefault(); 
+                if (readOnly) return;
+                if (e.cancelable) e.preventDefault(); 
                 const { x, y } = getPos(e);
                 const ctx = canvasRef.current.getContext('2d');
                 ctx.beginPath();
@@ -104,8 +148,8 @@
             };
 
             const draw = (e) => {
-                if (!isDrawing) return;
-                e.preventDefault();
+                if (readOnly || !isDrawing) return;
+                if (e.cancelable) e.preventDefault();
                 const { x, y } = getPos(e);
                 const ctx = canvasRef.current.getContext('2d');
                 ctx.lineTo(x, y);
@@ -132,12 +176,12 @@
             };
 
             return (
-                <div className="relative w-full h-64 bg-white rounded-xl overflow-hidden touch-none border-2 border-slate-600 print-border">
+                <div className={`relative w-full h-64 bg-white rounded-xl overflow-hidden touch-none border-2 border-slate-600 print-border ${readOnly ? 'pointer-events-none' : ''}`}>
                     <canvas
                         ref={canvasRef}
                         width={600}
                         height={400}
-                        className="w-full h-full cursor-crosshair"
+                        className={`w-full h-full ${readOnly ? 'cursor-default' : 'cursor-crosshair'}`}
                         onMouseDown={startDrawing}
                         onMouseMove={draw}
                         onMouseUp={stopDrawing}
@@ -146,23 +190,25 @@
                         onTouchMove={draw}
                         onTouchEnd={stopDrawing}
                     />
-                    <button 
-                        onClick={clearCanvas}
-                        className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white text-xs px-3 py-1 rounded-full shadow no-print"
-                    >
-                        清除重畫
-                    </button>
-                    <div className="absolute bottom-2 left-2 text-slate-400 text-xs pointer-events-none select-none no-print">
-                        請在此處繪畫
-                    </div>
+                    {!readOnly && (
+                        <>
+                            <button 
+                                onClick={clearCanvas}
+                                className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white text-xs px-3 py-1 rounded-full shadow no-print"
+                            >
+                                清除重畫
+                            </button>
+                            <div className="absolute bottom-2 left-2 text-slate-400 text-xs pointer-events-none select-none no-print">
+                                請在此處繪畫
+                            </div>
+                        </>
+                    )}
                 </div>
             );
         };
 
-        // --- 新元件：互動式情緒選擇器 ---
-        const MoodSelector = ({ label, value, onChange }) => {
-            // value 結構: { color: 'red' | 'yellow' | 'blue' | 'green' | null, text: string }
-            
+        // --- 元件：互動式情緒選擇器 ---
+        const MoodSelector = ({ label, value, onChange, readOnly = false }) => {
             const moodOptions = [
                 { id: 'red', label: '🔴 紅色', bg: 'bg-red-500', border: 'border-red-500', light: 'bg-red-900/20', textCol: 'text-red-200' },
                 { id: 'yellow', label: '🟡 黃色', bg: 'bg-yellow-500', border: 'border-yellow-500', light: 'bg-yellow-900/20', textCol: 'text-yellow-200' },
@@ -175,12 +221,11 @@
             return (
                 <div className="mb-4">
                     <p className="mb-2 text-sm text-slate-400 print-text-black">{label}</p>
-                    
-                    {/* 顏色按鈕區 */}
                     <div className="flex flex-wrap gap-3 mb-3">
                         {moodOptions.map(opt => (
                             <button
                                 key={opt.id}
+                                disabled={readOnly}
                                 onClick={() => onChange({ ...value, color: opt.id })}
                                 className={`
                                     flex items-center gap-2 px-4 py-2 rounded-xl border-2 transition-all duration-200
@@ -190,6 +235,8 @@
                                     }
                                     print-border
                                     ${value.color === opt.id ? '' : 'print-hidden-if-inactive'} 
+                                    ${readOnly ? 'cursor-default opacity-100' : ''}
+                                    ${readOnly && value.color !== opt.id ? 'hidden' : ''}
                                 `}
                             >
                                 <span className="text-lg">{opt.label.split(' ')[0]}</span>
@@ -197,8 +244,6 @@
                             </button>
                         ))}
                     </div>
-
-                    {/* 輸入框區 (選取後出現) */}
                     {activeOption && (
                         <div className={`
                             animate-[fadeIn_0.3s_ease-out]
@@ -211,8 +256,9 @@
                                 <input 
                                     type="text" 
                                     value={value.text}
+                                    readOnly={readOnly}
                                     onChange={(e) => onChange({ ...value, text: e.target.value })}
-                                    placeholder={`請輸入${activeOption.label.split(' ')[1]}卡的心情關鍵字...`}
+                                    placeholder={readOnly ? "" : `請輸入${activeOption.label.split(' ')[1]}卡的心情關鍵字...`}
                                     className={`
                                         w-full bg-transparent border-b-2 border-white/20 outline-none text-lg py-1 px-2 
                                         placeholder-slate-400/70 focus:border-white/50 transition-colors
@@ -223,7 +269,7 @@
                              </div>
                         </div>
                     )}
-                    {!activeOption && (
+                    {!activeOption && !readOnly && (
                         <div className="text-slate-500 text-sm italic py-2 print-hidden-if-inactive">
                             👆 請先點選上方顏色卡片
                         </div>
@@ -234,7 +280,6 @@
 
         // --- 主程式 ---
         const App = () => {
-            // 資料結構
             const [data, setData] = useState({
                 date: new Date().toISOString().split('T')[0],
                 playerId: '',
@@ -253,7 +298,10 @@
                 reason: ''
             });
 
+            const [isPreview, setIsPreview] = useState(false);
+
             const toggleNextTime = (item) => {
+                if (isPreview) return;
                 setData(prev => {
                     const list = prev.nextTime.includes(item)
                         ? prev.nextTime.filter(i => i !== item)
@@ -263,10 +311,10 @@
             };
 
             const fillReason = (text) => {
+                if (isPreview) return;
                 setData(prev => ({ ...prev, reason: text }));
             };
 
-            // 區塊標題元件
             const SectionTitle = ({ num, title }) => (
                 <div className="flex items-center gap-2 mb-4 border-b border-cyan-500/30 pb-2 print-border-b print-text-black">
                     <div className="bg-cyan-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold print-bg-none print-text-black print-border">
@@ -276,219 +324,255 @@
                 </div>
             );
 
+            const containerClass = isPreview 
+                ? "min-h-screen bg-white text-black preview-mode" 
+                : "min-h-screen bg-slate-900 text-white";
+
             return (
-                <div className="max-w-4xl mx-auto p-4 md:p-8">
+                <div className={containerClass}>
                     
-                    {/* Author: 開頭 */}
-                    <div className="text-center mb-6">
-                        <span className="text-xl font-bold text-cyan-500 tracking-[0.2em] print-text-black">鏡如老師｜編制</span>
-                    </div>
+                    {/* 預覽模式下的浮動控制列 */}
+                    {isPreview && (
+                        <div className="fixed top-0 left-0 w-full bg-slate-800 p-4 shadow-xl z-50 flex justify-center gap-4 no-print preview-controls animate-[fadeIn_0.3s]">
+                            <button 
+                                onClick={() => setIsPreview(false)}
+                                className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-6 rounded-lg transition-colors flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                                返回編輯
+                            </button>
+                            <button 
+                                onClick={() => window.print()}
+                                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg flex items-center gap-2 animate-pulse"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                確認列印
+                            </button>
+                        </div>
+                    )}
 
-                    {/* Header - Screen Only */}
-                    <div className="text-center mb-8 no-print">
-                        <h1 className="text-4xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 neon-text mb-2">
-                            實況 Action！實戰紀錄表
-                        </h1>
-                        <p className="text-slate-400">填寫你的戰鬥數據，生成專屬的回放紀錄！</p>
-                    </div>
-
-                    {/* Print Header */}
-                    <div className="print-only text-center mb-6 border-b-2 border-black pb-4">
-                        <h1 className="text-3xl font-bold">【實況 Action！實戰紀錄表】</h1>
-                    </div>
-
-                    <div className="bg-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-700 print-bg-none print-border print-text-black neon-box">
+                    <div className={`max-w-4xl mx-auto p-4 md:p-8 ${isPreview ? 'pt-24' : ''}`}>
                         
-                        {/* 1. 任務檔案資訊 */}
-                        <section className="mb-8">
-                            <SectionTitle num="1" title="任務檔案資訊" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-1">
-                                    <label className="text-sm text-slate-400 print-text-black">日期 Date</label>
-                                    <input type="date" value={data.date} onChange={e => setData({...data, date: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-2 focus:border-cyan-500 outline-none" />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-sm text-slate-400 print-text-black">玩家 ID (姓名)</label>
-                                    <input type="text" value={data.playerId} onChange={e => setData({...data, playerId: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-2 focus:border-cyan-500 outline-none" placeholder="輸入姓名" />
-                                </div>
-                                <div className="space-y-1 md:col-span-2">
-                                    <label className="text-sm text-slate-400 print-text-black">今天的劇本主題</label>
-                                    <input type="text" value={data.theme} onChange={e => setData({...data, theme: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-2 focus:border-cyan-500 outline-none" placeholder="例如：失落的小樂" />
-                                </div>
-                                <div className="space-y-1 md:col-span-2">
-                                    <label className="text-sm text-slate-400 print-text-black">我的連線隊友</label>
-                                    <input type="text" value={data.teammate} onChange={e => setData({...data, teammate: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-2 focus:border-cyan-500 outline-none" placeholder="輸入隊友名字" />
-                                </div>
-                            </div>
-                        </section>
+                        {/* Author: 開頭 */}
+                        <div className="text-center mb-6">
+                            <span className="text-xl font-bold text-cyan-500 tracking-[0.2em] print-text-black">鏡如老師｜編制</span>
+                        </div>
 
-                        {/* 2. 角色登入 */}
-                        <section className="mb-8">
-                            <SectionTitle num="2" title="角色登入" />
-                            <div className="mb-6">
-                                <p className="mb-2 font-bold">剛才那一場戲，我扮演的角色是：</p>
-                                <div className="flex flex-wrap gap-4">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name="role" checked={data.role === 'main'} onChange={() => setData({...data, role: 'main'})} className="accent-cyan-500 w-5 h-5" />
-                                        <span>某位角色：</span>
-                                        <input 
-                                            type="text" 
-                                            value={data.roleName} 
-                                            onChange={e => setData({...data, roleName: e.target.value})} 
-                                            disabled={data.role !== 'main'}
-                                            className="bg-slate-900 border-b border-slate-500 px-2 py-1 outline-none focus:border-cyan-500 disabled:opacity-50 print-text-black" 
-                                            placeholder="角色名稱"
-                                        />
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name="role" checked={data.role === 'observer'} onChange={() => setData({...data, role: 'observer'})} className="accent-cyan-500 w-5 h-5" />
-                                        <span>旁白 / 觀察員</span>
-                                    </label>
-                                </div>
-                            </div>
+                        {/* Header - Screen Only */}
+                        <div className="text-center mb-8 no-print">
+                            <h1 className="text-4xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 neon-text mb-2">
+                                實況 Action！實戰紀錄表
+                            </h1>
+                            <p className="text-slate-400">填寫你的戰鬥數據，生成專屬的回放紀錄！</p>
+                        </div>
+
+                        {/* Print Header */}
+                        <div className="print-only text-center mb-6 border-b-2 border-black pb-4">
+                            <h1 className="text-3xl font-bold">【實況 Action！實戰紀錄表】</h1>
+                        </div>
+
+                        <div className="bg-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-700 print-bg-none print-border print-text-black neon-box">
                             
-                            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 print-bg-none print-border">
-                                <MoodSelector 
-                                    label="這個角色的心情感覺是... (請點選顏色)" 
-                                    value={data.mood} 
-                                    onChange={(newVal) => setData({...data, mood: newVal})} 
-                                />
-                            </div>
-                        </section>
-
-                        {/* 3. 精彩回放 */}
-                        <section className="mb-8 break-inside-avoid">
-                            <SectionTitle num="3" title="精彩回放" />
-                            
-                            <div className="mb-6">
-                                <p className="font-bold mb-2">【動作卡】我做了一個什麼動作？</p>
-                                <p className="text-xs text-slate-400 mb-2 print-text-black">(請畫出來或寫下來，例如：抱著膝蓋、手指對方、插腰)</p>
-                                <DrawingCanvas onSave={(img) => setData({...data, actionImage: img})} />
-                            </div>
-
-                            <div>
-                                <p className="font-bold mb-2">台詞紀錄：我說了什麼話？</p>
-                                <div className="flex items-start gap-2 bg-slate-900 p-4 rounded-xl border border-slate-600 print-bg-none print-border">
-                                    <span className="text-2xl">💬 : 「</span>
-                                    <textarea 
-                                        value={data.dialogue}
-                                        onChange={e => setData({...data, dialogue: e.target.value})}
-                                        className="flex-1 bg-transparent outline-none resize-none h-20 leading-relaxed text-lg"
-                                        placeholder="在這裡輸入你的台詞..."
-                                    ></textarea>
-                                    <span className="text-2xl self-end">」</span>
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* 4. 心智解讀 */}
-                        <section className="mb-8 break-inside-avoid">
-                            <SectionTitle num="4" title="心智解讀" />
-                            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 print-bg-none print-border">
-                                <p className="mb-2">當我這樣做的時候，我的隊友</p>
-                                <input 
-                                    type="text" 
-                                    value={data.teammateRole}
-                                    onChange={e => setData({...data, teammateRole: e.target.value})}
-                                    className="w-full bg-slate-800 border-b-2 border-cyan-500 mb-2 px-2 py-1 text-cyan-300 font-bold outline-none print-text-black"
-                                    placeholder="[ 寫上隊友角色 ]"
-                                />
-                                <p className="mb-4">的情緒可能是... (請點選顏色)</p>
-                                
-                                <MoodSelector 
-                                    label="參考情緒卡" 
-                                    value={data.teammateMood} 
-                                    onChange={(newVal) => setData({...data, teammateMood: newVal})} 
-                                />
-                            </div>
-                        </section>
-
-                        {/* 5. 經驗值結算 */}
-                        <section className="mb-8 break-inside-avoid">
-                            <SectionTitle num="5" title="經驗值結算" />
-                            
-                            <div className="flex gap-8 mb-6">
-                                <div className="flex items-center gap-3">
-                                    <span className="font-bold">演技指數：</span>
-                                    <StarRating value={data.actScore} onChange={(v) => setData({...data, actScore: v})} />
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="font-bold">合作指數：</span>
-                                    <StarRating value={data.coopScore} onChange={(v) => setData({...data, coopScore: v})} color="text-green-400" />
-                                </div>
-                            </div>
-
-                            <div className="mb-6">
-                                <p className="font-bold mb-3">如果下次再演一次，我想要試試看...</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {['演不一樣的角色', '講不一樣的台詞', '動作再大一點', '聲音再大聲一點', '其他'].map(opt => (
-                                        <label key={opt} className="flex items-center gap-2 cursor-pointer hover:bg-slate-700/50 p-2 rounded transition-colors">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={data.nextTime.includes(opt)}
-                                                onChange={() => toggleNextTime(opt)}
-                                                className="accent-cyan-500 w-5 h-5"
-                                            />
-                                            <span>{opt}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-600 relative print-bg-none print-border">
-                                <p className="font-bold mb-2">為什麼呢？請說明：</p>
-                                <textarea 
-                                    value={data.reason}
-                                    onChange={e => setData({...data, reason: e.target.value})}
-                                    className="w-full h-24 bg-transparent outline-none resize-none"
-                                    placeholder="寫下你的想法..."
-                                ></textarea>
-                                
-                                {/* 導演小抄 (不列印) */}
-                                <div className="mt-4 pt-4 border-t border-slate-700 no-print">
-                                    <div className="flex items-center gap-2 mb-2 text-yellow-400">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
-                                        <span className="font-bold">導演小抄 (點擊自動填入)</span>
+                            {/* 1. 任務檔案資訊 */}
+                            <section className="mb-8">
+                                <SectionTitle num="1" title="任務檔案資訊" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-1">
+                                        <label className="text-sm text-slate-400 print-text-black">日期 Date</label>
+                                        <input type="date" value={data.date} readOnly={isPreview} onChange={e => setData({...data, date: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-2 focus:border-cyan-500 outline-none" />
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {[
-                                            "因為我覺得這樣演比較帥/好笑。",
-                                            "因為我想要試試看不一樣的感覺。",
-                                            "因為我覺得原本的聲音太小聲了。",
-                                            "因為我想看看對手會有什麼反應。"
-                                        ].map((hint, idx) => (
-                                            <button 
-                                                key={idx}
-                                                onClick={() => fillReason(hint)}
-                                                className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-slate-300 transition-colors"
-                                            >
-                                                {hint}
-                                            </button>
+                                    <div className="space-y-1">
+                                        <label className="text-sm text-slate-400 print-text-black">玩家 ID (姓名)</label>
+                                        <input type="text" value={data.playerId} readOnly={isPreview} onChange={e => setData({...data, playerId: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-2 focus:border-cyan-500 outline-none" placeholder="輸入姓名" />
+                                    </div>
+                                    <div className="space-y-1 md:col-span-2">
+                                        <label className="text-sm text-slate-400 print-text-black">今天的劇本主題</label>
+                                        <input type="text" value={data.theme} readOnly={isPreview} onChange={e => setData({...data, theme: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-2 focus:border-cyan-500 outline-none" placeholder="例如：失落的小樂" />
+                                    </div>
+                                    <div className="space-y-1 md:col-span-2">
+                                        <label className="text-sm text-slate-400 print-text-black">我的連線隊友</label>
+                                        <input type="text" value={data.teammate} readOnly={isPreview} onChange={e => setData({...data, teammate: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded p-2 focus:border-cyan-500 outline-none" placeholder="輸入隊友名字" />
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* 2. 角色登入 */}
+                            <section className="mb-8">
+                                <SectionTitle num="2" title="角色登入" />
+                                <div className="mb-6">
+                                    <p className="mb-2 font-bold">剛才那一場戲，我扮演的角色是：</p>
+                                    <div className="flex flex-wrap gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="role" disabled={isPreview} checked={data.role === 'main'} onChange={() => setData({...data, role: 'main'})} className="accent-cyan-500 w-5 h-5" />
+                                            <span>某位角色：</span>
+                                            <input 
+                                                type="text" 
+                                                value={data.roleName} 
+                                                readOnly={isPreview}
+                                                onChange={e => setData({...data, roleName: e.target.value})} 
+                                                disabled={data.role !== 'main'}
+                                                className="bg-slate-900 border-b border-slate-500 px-2 py-1 outline-none focus:border-cyan-500 disabled:opacity-50 print-text-black" 
+                                                placeholder="角色名稱"
+                                            />
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="role" disabled={isPreview} checked={data.role === 'observer'} onChange={() => setData({...data, role: 'observer'})} className="accent-cyan-500 w-5 h-5" />
+                                            <span>旁白 / 觀察員</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 print-bg-none print-border">
+                                    <MoodSelector 
+                                        label="這個角色的心情感覺是... (請點選顏色)" 
+                                        value={data.mood} 
+                                        readOnly={isPreview}
+                                        onChange={(newVal) => setData({...data, mood: newVal})} 
+                                    />
+                                </div>
+                            </section>
+
+                            {/* 3. 精彩回放 */}
+                            <section className="mb-8 break-inside-avoid">
+                                <SectionTitle num="3" title="精彩回放" />
+                                
+                                <div className="mb-6">
+                                    <p className="font-bold mb-2">【動作卡】我做了一個什麼動作？</p>
+                                    <p className="text-xs text-slate-400 mb-2 print-text-black">(請畫出來或寫下來，例如：抱著膝蓋、手指對方、插腰)</p>
+                                    <DrawingCanvas onSave={(img) => setData({...data, actionImage: img})} readOnly={isPreview} />
+                                </div>
+
+                                <div>
+                                    <p className="font-bold mb-2">台詞紀錄：我說了什麼話？</p>
+                                    <div className="flex items-start gap-2 bg-slate-900 p-4 rounded-xl border border-slate-600 print-bg-none print-border">
+                                        <span className="text-2xl">💬 : 「</span>
+                                        <textarea 
+                                            value={data.dialogue}
+                                            readOnly={isPreview}
+                                            onChange={e => setData({...data, dialogue: e.target.value})}
+                                            className="flex-1 bg-transparent outline-none resize-none h-20 leading-relaxed text-lg"
+                                            placeholder="在這裡輸入你的台詞..."
+                                        ></textarea>
+                                        <span className="text-2xl self-end">」</span>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* 4. 心智解讀 */}
+                            <section className="mb-8 break-inside-avoid">
+                                <SectionTitle num="4" title="心智解讀" />
+                                <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 print-bg-none print-border">
+                                    <p className="mb-2">當我這樣做的時候，我的隊友</p>
+                                    <input 
+                                        type="text" 
+                                        value={data.teammateRole}
+                                        readOnly={isPreview}
+                                        onChange={e => setData({...data, teammateRole: e.target.value})}
+                                        className="w-full bg-slate-800 border-b-2 border-cyan-500 mb-2 px-2 py-1 text-cyan-300 font-bold outline-none print-text-black"
+                                        placeholder="[ 寫上隊友角色 ]"
+                                    />
+                                    <p className="mb-4">的情緒可能是... (請點選顏色)</p>
+                                    
+                                    <MoodSelector 
+                                        label="參考情緒卡" 
+                                        value={data.teammateMood} 
+                                        readOnly={isPreview}
+                                        onChange={(newVal) => setData({...data, teammateMood: newVal})} 
+                                    />
+                                </div>
+                            </section>
+
+                            {/* 5. 經驗值結算 */}
+                            <section className="mb-8 break-inside-avoid">
+                                <SectionTitle num="5" title="經驗值結算" />
+                                
+                                <div className="flex gap-8 mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-bold">演技指數：</span>
+                                        <StarRating value={data.actScore} readOnly={isPreview} onChange={(v) => setData({...data, actScore: v})} />
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-bold">合作指數：</span>
+                                        <StarRating value={data.coopScore} readOnly={isPreview} onChange={(v) => setData({...data, coopScore: v})} color="text-green-400" />
+                                    </div>
+                                </div>
+
+                                <div className="mb-6">
+                                    <p className="font-bold mb-3">如果下次再演一次，我想要試試看...</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {['演不一樣的角色', '講不一樣的台詞', '動作再大一點', '聲音再大聲一點', '其他'].map(opt => (
+                                            <label key={opt} className={`flex items-center gap-2 hover:bg-slate-700/50 p-2 rounded transition-colors ${isPreview ? 'cursor-default' : 'cursor-pointer'}`}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    disabled={isPreview}
+                                                    checked={data.nextTime.includes(opt)}
+                                                    onChange={() => toggleNextTime(opt)}
+                                                    className="accent-cyan-500 w-5 h-5"
+                                                />
+                                                <span>{opt}</span>
+                                            </label>
                                         ))}
                                     </div>
                                 </div>
-                            </div>
-                        </section>
 
-                        {/* Footer Buttons (No Print) */}
-                        <div className="flex justify-center gap-4 mt-8 no-print">
-                            <button 
-                                onClick={() => window.print()}
-                                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-cyan-500/30 flex items-center gap-2 transition-all transform hover:-translate-y-1 active:translate-y-0"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                                列印紀錄表 (PDF)
-                            </button>
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-600 relative print-bg-none print-border">
+                                    <p className="font-bold mb-2">為什麼呢？請說明：</p>
+                                    <textarea 
+                                        value={data.reason}
+                                        readOnly={isPreview}
+                                        onChange={e => setData({...data, reason: e.target.value})}
+                                        className="w-full h-24 bg-transparent outline-none resize-none"
+                                        placeholder="寫下你的想法..."
+                                    ></textarea>
+                                    
+                                    {/* 導演小抄 (不列印, 預覽模式隱藏) */}
+                                    <div className="mt-4 pt-4 border-t border-slate-700 no-print director-notes">
+                                        <div className="flex items-center gap-2 mb-2 text-yellow-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                                            <span className="font-bold">導演小抄 (點擊自動填入)</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {[
+                                                "因為我覺得這樣演比較帥/好笑。",
+                                                "因為我想要試試看不一樣的感覺。",
+                                                "因為我覺得原本的聲音太小聲了。",
+                                                "因為我想看看對手會有什麼反應。"
+                                            ].map((hint, idx) => (
+                                                <button 
+                                                    key={idx}
+                                                    onClick={() => fillReason(hint)}
+                                                    className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-slate-300 transition-colors"
+                                                >
+                                                    {hint}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Footer Buttons (No Print) */}
+                            {!isPreview && (
+                                <div className="flex justify-center gap-4 mt-8 no-print">
+                                    <button 
+                                        onClick={() => setIsPreview(true)}
+                                        className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-cyan-500/30 flex items-center gap-2 transition-all transform hover:-translate-y-1 active:translate-y-0"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                        預覽列印
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                    
-                    {/* Author: 結尾 */}
-                    <div className="text-center mt-8 mb-4">
-                        <span className="text-sm font-bold text-slate-500 tracking-[0.2em] print-text-black">鏡如老師｜編制</span>
-                    </div>
+                        
+                        {/* Author: 結尾 */}
+                        <div className="text-center mt-8 mb-4">
+                            <span className="text-sm font-bold text-slate-500 tracking-[0.2em] print-text-black">鏡如老師｜編制</span>
+                        </div>
 
-                    <div className="text-center mt-4 text-slate-500 text-sm no-print">
-                        Designed for Learning • Actions Speak Louder Than Words
+                        <div className="text-center mt-4 text-slate-500 text-sm no-print">
+                            Designed for Learning • Actions Speak Louder Than Words
+                        </div>
                     </div>
                 </div>
             );
