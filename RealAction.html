@@ -17,13 +17,18 @@
         /* Mac 字體優化 */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif; }
         
-        /* --- 列印專用樣式 (Print CSS) --- */
+        /* --- 1. 列印專用樣式 (Print CSS) --- */
         @media print {
             @page { size: A4; margin: 1cm; }
             body { background-color: white !important; color: black !important; -webkit-print-color-adjust: exact; }
             
-            .no-print { display: none !important; }
+            /* ⚠️ 絕對隱藏：確保列印時控制列消失，不遮擋內容 */
+            .no-print, .preview-controls { display: none !important; }
+            
+            /* 顯示列印專用內容 */
             .print-only { display: block !important; }
+            
+            /* 列印版面樣式強制轉為黑白 */
             .print-border { border: 2px solid #000 !important; box-shadow: none !important; }
             .print-bg-none { background: none !important; }
             .print-text-black { color: black !important; }
@@ -38,15 +43,17 @@
             .print-hidden-if-inactive { display: none !important; }
         }
 
-        /* --- 預覽模式樣式 (模擬列印效果) --- */
+        /* --- 2. 預覽模式樣式 (模擬列印效果) --- */
         .preview-mode {
             background-color: white !important;
             color: black !important;
             min-height: 100vh;
         }
+        
+        /* 在螢幕預覽模式下隱藏普通編輯元件 */
         .preview-mode .no-print { display: none !important; }
         
-        /* 強制顯示預覽控制列 */
+        /* ⚠️ 顯示控制列：僅限預覽模式時顯示在螢幕底部 */
         .preview-mode .preview-controls { display: flex !important; }
 
         .preview-mode .print-only { display: block !important; }
@@ -55,31 +62,43 @@
         .preview-mode .print-text-black { color: black !important; }
         .preview-mode .neon-box { box-shadow: none !important; border: none !important; }
         
-        /* 預覽模式下的輸入框樣式 (強制為黑色，去除預設 disabled 灰色樣式) */
+        /* 預覽模式下的輸入框樣式 */
         .preview-mode input, .preview-mode textarea { 
             border: none !important; 
             border-bottom: 1px solid #ccc !important; 
             background: transparent !important; 
             color: black !important; 
-            opacity: 1 !important; /* 防止 disabled 變透明 */
-            -webkit-text-fill-color: black !important; /* 修正 Safari/Chrome disabled 文字顏色 */
+            opacity: 1 !important; 
+            -webkit-text-fill-color: black !important;
             cursor: default !important;
         }
         
-        /* 預覽模式下隱藏沒選中的選項 */
         .preview-mode .print-hidden-if-inactive { display: none !important; }
-        
-        /* 隱藏導演小抄 */
         .preview-mode .director-notes { display: none !important; }
 
 
-        /* --- 一般螢幕顯示樣式 --- */
+        /* --- 3. 一般編輯模式顯示樣式 --- */
         .print-only { display: none; }
         .neon-box {
             box-shadow: 0 0 10px rgba(34, 211, 238, 0.3), inset 0 0 20px rgba(34, 211, 238, 0.1);
         }
         .neon-text {
             text-shadow: 0 0 5px rgba(34, 211, 238, 0.8);
+        }
+
+        /* 預覽控制列的基本樣式 */
+        .preview-controls {
+            position: fixed;
+            bottom: 0; /* 修改處：從頂部移到底部 */
+            left: 0;
+            width: 100%;
+            background-color: #1e293b; /* Slate 800 */
+            padding: 1.25rem;
+            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.3); /* 修改處：陰影改為向上 */
+            z-index: 9999;
+            justify-content: center;
+            gap: 1.5rem;
+            display: none; /* 預設隱藏 */
         }
     </style>
 </head>
@@ -107,7 +126,7 @@
             );
         };
 
-        // --- 元件：繪圖板 ---
+        // --- 元件：繪圖板 (同步座標版) ---
         const DrawingCanvas = ({ onSave, readOnly = false }) => {
             const canvasRef = useRef(null);
             const [isDrawing, setIsDrawing] = useState(false);
@@ -115,11 +134,9 @@
             useEffect(() => {
                 const canvas = canvasRef.current;
                 const ctx = canvas.getContext('2d');
-                ctx.strokeStyle = '#000'; // 預設黑色畫筆
+                ctx.strokeStyle = '#000'; 
                 ctx.lineWidth = 3;
                 ctx.lineCap = 'round';
-                
-                // 填滿白色背景
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }, []);
@@ -207,7 +224,7 @@
             );
         };
 
-        // --- 元件：互動式情緒選擇器 ---
+        // --- 元件：情緒選擇器 ---
         const MoodSelector = ({ label, value, onChange, readOnly = false }) => {
             const moodOptions = [
                 { id: 'red', label: '🔴 紅色', bg: 'bg-red-500', border: 'border-red-500', light: 'bg-red-900/20', textCol: 'text-red-200' },
@@ -235,7 +252,6 @@
                                     }
                                     print-border
                                     ${value.color === opt.id ? '' : 'print-hidden-if-inactive'} 
-                                    ${readOnly ? 'cursor-default opacity-100' : ''}
                                     ${readOnly && value.color !== opt.id ? 'hidden' : ''}
                                 `}
                             >
@@ -267,11 +283,6 @@
                                     `}
                                 />
                              </div>
-                        </div>
-                    )}
-                    {!activeOption && !readOnly && (
-                        <div className="text-slate-500 text-sm italic py-2 print-hidden-if-inactive">
-                            👆 請先點選上方顏色卡片
                         </div>
                     )}
                 </div>
@@ -331,27 +342,26 @@
             return (
                 <div className={containerClass}>
                     
-                    {/* 預覽模式下的浮動控制列 */}
-                    {isPreview && (
-                        <div className="fixed top-0 left-0 w-full bg-slate-800 p-4 shadow-xl z-50 flex justify-center gap-4 no-print preview-controls animate-[fadeIn_0.3s]">
-                            <button 
-                                onClick={() => setIsPreview(false)}
-                                className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-6 rounded-lg transition-colors flex items-center gap-2"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                                返回編輯
-                            </button>
-                            <button 
-                                onClick={() => window.print()}
-                                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg flex items-center gap-2 animate-pulse"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                                確認列印
-                            </button>
-                        </div>
-                    )}
+                    {/* 預覽模式下的底部控制列 (修改處：位置已從 CSS 調整到底部) */}
+                    <div className="preview-controls">
+                        <button 
+                            onClick={() => setIsPreview(false)}
+                            className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-6 rounded-lg transition-colors flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                            返回編輯
+                        </button>
+                        <button 
+                            onClick={() => window.print()}
+                            className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg flex items-center gap-2 animate-pulse"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            確認列印
+                        </button>
+                    </div>
 
-                    <div className={`max-w-4xl mx-auto p-4 md:p-8 ${isPreview ? 'pt-24' : ''}`}>
+                    {/* 修改處：預覽模式下改為 pb-24 (底部間距) */}
+                    <div className={`max-w-4xl mx-auto p-4 md:p-8 ${isPreview ? 'pb-24' : ''}`}>
                         
                         {/* Author: 開頭 */}
                         <div className="text-center mb-6">
@@ -525,33 +535,35 @@
                                         placeholder="寫下你的想法..."
                                     ></textarea>
                                     
-                                    {/* 導演小抄 (不列印, 預覽模式隱藏) */}
-                                    <div className="mt-4 pt-4 border-t border-slate-700 no-print director-notes">
-                                        <div className="flex items-center gap-2 mb-2 text-yellow-400">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
-                                            <span className="font-bold">導演小抄 (點擊自動填入)</span>
+                                    {/* 導演小抄 (僅編輯模式顯示) */}
+                                    {!isPreview && (
+                                        <div className="mt-4 pt-4 border-t border-slate-700 director-notes no-print">
+                                            <div className="flex items-center gap-2 mb-2 text-yellow-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                                                <span className="font-bold">導演小抄 (點擊自動填入)</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {[
+                                                    "因為我覺得這樣演比較帥/好笑。",
+                                                    "因為我想要試試看不一樣的感覺。",
+                                                    "因為我覺得原本的聲音太小聲了。",
+                                                    "因為我想看看對手會有什麼反應。"
+                                                ].map((hint, idx) => (
+                                                    <button 
+                                                        key={idx}
+                                                        onClick={() => fillReason(hint)}
+                                                        className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-slate-300 transition-colors"
+                                                    >
+                                                        {hint}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {[
-                                                "因為我覺得這樣演比較帥/好笑。",
-                                                "因為我想要試試看不一樣的感覺。",
-                                                "因為我覺得原本的聲音太小聲了。",
-                                                "因為我想看看對手會有什麼反應。"
-                                            ].map((hint, idx) => (
-                                                <button 
-                                                    key={idx}
-                                                    onClick={() => fillReason(hint)}
-                                                    className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-full text-slate-300 transition-colors"
-                                                >
-                                                    {hint}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             </section>
 
-                            {/* Footer Buttons (No Print) */}
+                            {/* 預覽按鈕 (僅編輯模式顯示) */}
                             {!isPreview && (
                                 <div className="flex justify-center gap-4 mt-8 no-print">
                                     <button 
