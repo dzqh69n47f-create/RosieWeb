@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社交大冒險：犀牛與小西瓜的情境挑戰</title>
+    <!-- 引入 React, ReactDOM 與 Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Lucide Core (比 React 版在 UMD 環境更穩定) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #FFFDF9;
+        }
+        /* 增加平滑動畫 */
+        .fade-enter { opacity: 0; transform: translateY(10px); }
+        .fade-enter-active { opacity: 1; transform: translateY(0); transition: all 0.5s; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // 安全的圖示組件：使用 Lucide Core 的渲染方式
+        const Icon = ({ name, className = "w-5 h-5", color = "currentColor" }) => {
+            const iconRef = useRef(null);
+            
+            useEffect(() => {
+                if (iconRef.current) {
+                    // 清空舊內容並渲染新圖示
+                    iconRef.current.innerHTML = '';
+                    const iconSvg = lucide.icons[name];
+                    if (iconSvg) {
+                        const content = iconSvg[2] || '';
+                        iconRef.current.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}">${content}</svg>`;
+                    }
+                }
+            }, [name, className, color]);
+
+            return <span ref={iconRef} className="inline-flex items-center justify-center"></span>;
+        };
+
+        const scenarios = [
+          { id: 1, category: '壞口氣怪獸', icon: '🗣️', title: '收東西太慢', content: '犀牛在收書包，小西瓜大叫：「你動作很慢耶！擋到我了啦！」', prompt: '如果你是犀牛，聽到這種語氣，你心裡是什麼感覺？你可以怎麼回應？' },
+          { id: 2, category: '壞口氣怪獸', icon: '🗣️', title: '想加入遊戲', content: '犀牛想玩球，小西瓜叉腰說：「我們人滿了，你走開啦！」', prompt: '拒絕別人時，語氣可以怎麼調整才不會讓人受傷？' },
+          { id: 3, category: '壞口氣怪獸', icon: '🗣️', title: '命令式說話', content: '小西瓜指著地上的垃圾對犀牛吼：「喂！那個垃圾你拿去丟掉！」', prompt: '小西瓜想要犀牛幫忙，應該要怎麼說才對？' },
+          { id: 4, category: '壞口氣怪獸', icon: '🗣️', title: '嫌棄分組', content: '老師宣布分組，小西瓜嘆氣說：「厚！為什麼我要跟犀牛一組，真倒楣。」', prompt: '在大家面前被嫌棄，犀牛心裡的小怪獸會跳出來嗎？他該怎麼辦？' },
+          { id: 5, category: '壞口氣怪獸', icon: '🗣️', title: '催促聲', content: '犀牛在寫字，小西瓜在旁邊一直敲桌子：「快點啦！你怎麼還沒寫完！」', prompt: '當別人在忙的時候，一直催促會造成什麼影響？' },
+          { id: 6, category: '壞口氣怪獸', icon: '🗣️', title: '嘲笑失誤', content: '犀牛不小心把水弄翻了，小西瓜大笑：「哈哈！犀牛你好笨喔！」', prompt: '當別人犯錯時，嘲笑會讓情況變好嗎？' },
+          { id: 7, category: '意外小火花', icon: '✨', title: '排隊碰撞', content: '排隊領午餐時，小西瓜不小心撞到犀牛的背，卻沒道歉就跑走。', prompt: '犀牛這時候應該覺得小西瓜是故意的嗎？他該去問清楚嗎？' },
+          { id: 8, category: '意外小火花', icon: '✨', title: '文具被弄掉', content: '小西瓜經過桌子，把犀牛的彩色筆掃到地上，還大聲說：「誰叫你放桌邊！」', prompt: '這是一場意外還是故意的？小西瓜為什麼要先大聲說話？' },
+          { id: 9, category: '意外小火花', icon: '✨', title: '喝水噴到', content: '小西瓜喝水時不小心噴到犀牛的衣服，還笑嘻嘻地看著他。', prompt: '「笑嘻嘻」的反應可能會讓犀牛誤會什麼？' },
+          { id: 10, category: '意外小火花', icon: '✨', title: '位子被坐', content: '犀牛上完廁所回來，發現小西瓜坐在他的位置上說：「這現在是我的位子了！」', prompt: '如果小西瓜只是想開玩笑，這個玩笑適合嗎？' },
+          { id: 11, category: '桌遊大挑戰', icon: '🎲', title: '皇后被搶', content: '玩《睡皇后》時，小西瓜連續兩次搶走犀牛最喜歡的「鬆餅皇后」。', prompt: '玩遊戲被針對時，要如何控制想發火的情緒？' },
+          { id: 12, category: '桌遊大挑戰', icon: '🎲', title: '高塔倒塌', content: '疊《超級犀牛》時，小西瓜手晃了一下讓塔倒掉，卻怪犀牛：「是你剛才弄歪的！」', prompt: '推卸責任會讓以後還有同學想跟你玩遊戲嗎？' },
+          { id: 13, category: '桌遊大挑戰', icon: '🎲', title: '抽不到好牌', content: '犀牛連續五回合都抽到數字牌，一張國王都沒有，心裡好想撕掉牌。', prompt: '這時候犀牛可以對自己說什麼話來轉移失落感？' },
+          { id: 14, category: '桌遊大挑戰', icon: '🎲', title: '被暫停回合', content: '小西瓜對犀牛出了一張「睡眠卡」，害犀牛這一輪不能動，只能看別人玩。', prompt: '這是遊戲規則。犀牛這時候可以做什麼來度過等待的時間？' },
+          { id: 15, category: '桌遊大挑戰', icon: '🎲', title: '被說作弊', content: '犀牛不小心多拿一張牌，小西瓜指著他大喊：「老師！犀牛作弊！他壞壞！」', prompt: '發現別人犯錯時，除了大喊「告狀」，還有更好的溝通方式嗎？' },
+          { id: 16, category: '社交小衝突', icon: '💬', title: '借東西不還', content: '小西瓜借了犀牛的橡皮擦，結果弄丟了，還回嘴：「不就一個橡皮擦，小氣鬼！」', prompt: '如果你是犀牛，你會怎麼捍衛自己的東西，又不跟對方吵架？' },
+          { id: 17, category: '社交小衝突', icon: '💬', title: '被取綽號', content: '小西瓜一直叫犀牛他不喜歡的難聽綽號，全班都在看。', prompt: '這時候犀牛應該：1.罵回去 2.裝沒聽到 3.嚴肅告訴對方我不喜歡？' },
+          { id: 18, category: '社交小衝突', icon: '💬', title: '意見被反對', content: '討論要去哪裡玩，犀牛想去操場，小西瓜大聲反對：「誰要去操場，無聊死了！」', prompt: '大家意見不同時，如何有禮貌地表達反對？' },
+          { id: 19, category: '社交小衝突', icon: '💬', title: '被冤枉了', content: '老師問誰在講話，明明是小西瓜，小西瓜卻指著犀牛說：「是他先跟我說話的！」', prompt: '被冤枉時，犀牛該如何冷靜向老師說明情況？' },
+          { id: 20, category: '社交小衝突', icon: '💬', title: '環境太吵', content: '教室裡大家都在吵架，犀牛覺得耳朵好痛、頭好亂，好想衝出教室跑掉。', prompt: '犀牛感覺到感官超載了，他可以怎麼跟老師求助？' },
+        ];
+
+        const categories = [
+          { name: '全部', icon: 'Shuffle', color: 'bg-slate-500' },
+          { name: '壞口氣怪獸', icon: 'MessageCircle', color: 'bg-rose-400' },
+          { name: '意外小火花', icon: 'AlertTriangle', color: 'bg-amber-400' },
+          { name: '桌遊大挑戰', icon: 'Sword', color: 'bg-emerald-400' },
+          { name: '社交小衝突', icon: 'BookOpen', color: 'bg-indigo-400' },
+        ];
+
+        function App() {
+          const [selectedCategory, setSelectedCategory] = useState('全部');
+          const [currentScenario, setCurrentScenario] = useState(null);
+          const [isDrawing, setIsDrawing] = useState(false);
+          const [history, setHistory] = useState([]);
+
+          const drawScenario = () => {
+            setIsDrawing(true);
+            const filteredScenarios = scenarios.filter(s => 
+              selectedCategory === '全部' || s.category === selectedCategory
+            );
+
+            let availableScenarios = filteredScenarios.filter(s => !history.includes(s.id));
+
+            if (availableScenarios.length === 0) {
+              availableScenarios = filteredScenarios.filter(s => s.id !== currentScenario?.id);
+              if (availableScenarios.length === 0) availableScenarios = filteredScenarios;
+            } else {
+                availableScenarios = availableScenarios.filter(s => s.id !== currentScenario?.id);
+                if (availableScenarios.length === 0) availableScenarios = [filteredScenarios.find(s => !history.includes(s.id)) || filteredScenarios[0]];
+            }
+
+            setTimeout(() => {
+              const randomIndex = Math.floor(Math.random() * availableScenarios.length);
+              const picked = availableScenarios[randomIndex];
+              setCurrentScenario(picked);
+              setHistory(prev => prev.includes(picked.id) ? prev : [...prev, picked.id]);
+              setIsDrawing(false);
+            }, 850);
+          };
+
+          const goBackToStart = () => setCurrentScenario(null);
+          const resetGame = () => {
+            setHistory([]);
+            setCurrentScenario(null);
+          };
+
+          return (
+            <div className="min-h-screen p-4 md:p-8 selection:bg-rose-100">
+              <div className="max-w-5xl mx-auto">
+                
+                {/* 頂部編制標示 */}
+                <div className="flex justify-center mb-4">
+                  <span className="bg-rose-50 text-rose-500 px-4 py-1 rounded-full text-sm font-bold border border-rose-100 shadow-sm flex items-center gap-2">
+                    <Icon name="Star" className="w-3 h-3" color="#f43f5e" /> 鏡如老師 編制
+                  </span>
+                </div>
+
+                {/* 標題區 */}
+                <header className="text-center mb-10">
+                  <h1 className="text-4xl md:text-5xl font-black text-[#2D3436] tracking-tight flex items-center justify-center gap-4">
+                    <span>🦏</span> 
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-rose-500">
+                      社交大冒險
+                    </span>
+                    <span>🍉</span>
+                  </h1>
+                  <p className="mt-3 text-slate-500 font-medium tracking-wide">犀牛與小西瓜的情境挑戰：在互動中練習情緒表達</p>
+                </header>
+
+                {/* 分類選擇器 */}
+                <div className="flex flex-wrap justify-center gap-3 mb-10">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.name}
+                      onClick={() => setSelectedCategory(cat.name)}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl transition-all duration-300 border-b-4 ${
+                        selectedCategory === cat.name
+                          ? `${cat.color} text-white border-black/10 shadow-lg -translate-y-1`
+                          : 'bg-white text-slate-500 border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Icon 
+                        name={cat.icon} 
+                        className="w-5 h-5" 
+                        color={selectedCategory === cat.name ? "white" : "#94a3b8"} 
+                      />
+                      <span className="font-bold">{cat.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 主要內容區 */}
+                <div className="grid lg:grid-cols-12 gap-10 items-start">
+                  
+                  {/* 左側：抽牌區 */}
+                  <div className="lg:col-span-7 flex flex-col items-center">
+                    <div 
+                      className={`relative w-full aspect-[4/5] max-w-md rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all duration-700 transform ${
+                        isDrawing ? 'scale-95 rotate-2 opacity-80' : 'hover:scale-[1.01]'
+                      } ${
+                        currentScenario 
+                          ? 'bg-white' 
+                          : 'bg-gradient-to-br from-emerald-400 via-emerald-500 to-rose-400'
+                      } border-[12px] border-white overflow-hidden`}
+                    >
+                      {isDrawing ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-6 text-center">
+                          <div className="w-16 h-16 border-[6px] border-white/30 border-t-white rounded-full animate-spin mb-6"></div>
+                          <p className="text-2xl font-black tracking-widest">翻開新挑戰...</p>
+                        </div>
+                      ) : currentScenario ? (
+                        <div className="p-10 h-full flex flex-col relative animate-in fade-in zoom-in duration-300">
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[15rem] opacity-[0.03] pointer-events-none select-none">
+                            {currentScenario.icon}
+                          </div>
+
+                          <div className="flex items-center justify-between mb-8 relative z-10">
+                            <span className="px-4 py-1.5 bg-rose-50 text-rose-500 text-xs font-black rounded-full uppercase tracking-wider border border-rose-100">
+                              {currentScenario.category}
+                            </span>
+                            <span className="text-4xl drop-shadow-sm">{currentScenario.icon}</span>
+                          </div>
+
+                          <h3 className="text-3xl font-black text-slate-800 mb-8 leading-tight relative z-10">
+                            {currentScenario.title}
+                          </h3>
+                          
+                          <div className="flex-grow flex items-center justify-center bg-slate-50/50 rounded-[2rem] p-8 border-2 border-dashed border-slate-200 relative z-10">
+                            <p className="text-xl md:text-2xl leading-relaxed text-slate-700 font-bold text-center">
+                              「{currentScenario.content}」
+                            </p>
+                          </div>
+
+                          <div className="mt-8 flex justify-between items-center relative z-10">
+                             <div className="text-slate-300 font-black text-sm italic tracking-widest uppercase">
+                                {history.includes(currentScenario.id) && history.length > 0 ? '已挑戰過' : '新的挑戰'}
+                             </div>
+                             <Icon 
+                                name="CheckCircle2" 
+                                className="w-8 h-8" 
+                                color={history.includes(currentScenario.id) ? "#10b981" : "#e2e8f0"} 
+                             />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-10 text-center">
+                          <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-8 backdrop-blur-sm">
+                            <Icon name="Shuffle" className="w-12 h-12" color="white" />
+                          </div>
+                          <h2 className="text-3xl font-black mb-4 tracking-tight">準備好了嗎？</h2>
+                          <p className="opacity-80 font-medium max-w-[250px]">選擇上方類別，點擊按鈕抽取一張情境卡</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-4 w-full max-w-md mt-10">
+                      <button
+                        onClick={drawScenario}
+                        disabled={isDrawing}
+                        className="group relative flex items-center justify-center gap-3 px-8 py-5 font-black text-white transition-all duration-300 bg-rose-500 rounded-2xl focus:outline-none hover:bg-rose-600 shadow-[0_10px_20px_-5px_rgba(244,63,94,0.4)] hover:-translate-y-1 active:translate-y-0"
+                      >
+                        <Icon name="Shuffle" className={`w-6 h-6 ${isDrawing ? 'animate-spin' : ''}`} color="white" />
+                        <span className="text-lg">
+                          {isDrawing ? '抽取中...' : (currentScenario ? '🎲 再抽一場挑戰' : '🎲 開始抽取挑戰')}
+                        </span>
+                      </button>
+                      
+                      {currentScenario && !isDrawing && (
+                        <button
+                          onClick={goBackToStart}
+                          className="flex items-center justify-center gap-2 px-8 py-4 font-bold text-slate-400 transition-all duration-300 bg-transparent rounded-2xl hover:text-slate-600 hover:bg-slate-100"
+                        >
+                          <Icon name="ChevronLeft" className="w-5 h-5" color="currentColor" /> 返回封面
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 右側：討論引導區 */}
+                  <div className="lg:col-span-5 space-y-8">
+                    <div className="bg-white rounded-[2rem] p-8 shadow-[0_10px_30px_rgba(0,0,0,0.05)] border border-slate-100 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-[4rem] -mr-8 -mt-8 opacity-50"></div>
+                      
+                      <h4 className="text-xl font-black text-indigo-600 flex items-center gap-2 mb-6 relative z-10">
+                        <Icon name="MessageCircle" className="w-6 h-6" color="#4f46e5" /> 引導對話處
+                      </h4>
+                      
+                      {currentScenario ? (
+                        <div className="space-y-6 relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                          <div className="p-6 bg-slate-50 rounded-2xl border-l-8 border-indigo-400">
+                            <p className="text-slate-800 font-bold text-lg leading-relaxed">
+                              {currentScenario.prompt}
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <p className="text-sm font-black text-slate-400 uppercase tracking-widest">思考指南</p>
+                            <div className="grid gap-3">
+                              <div className="p-4 bg-rose-50/50 rounded-xl border border-rose-100 flex items-start gap-3">
+                                <div className="w-6 h-6 bg-rose-400 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold">1</div>
+                                <p className="text-sm font-bold text-rose-700">犀牛此時的內心小劇場是什麼？</p>
+                              </div>
+                              <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 flex items-start gap-3">
+                                <div className="w-6 h-6 bg-emerald-400 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold">2</div>
+                                <p className="text-sm font-bold text-emerald-700">小西瓜如果換種做法，結局會不同嗎？</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-16 text-center text-slate-300 relative z-10">
+                          <div className="mb-4 flex justify-center">
+                            <Icon name="BookOpen" className="w-12 h-12" color="#e2e8f0" />
+                          </div>
+                          <p className="font-medium">請抽取一張情境卡<br/>展開你的討論大冒險</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 足跡紀錄 */}
+                    <div className="bg-white rounded-[2rem] p-8 shadow-[0_10px_30px_rgba(0,0,0,0.05)] border border-slate-100">
+                      <div className="flex justify-between items-center mb-6">
+                        <h4 className="text-lg font-black text-slate-700 flex items-center gap-2">
+                          <Icon name="RotateCcw" className="w-5 h-5" color="#334155" /> 完成足跡
+                        </h4>
+                        <button 
+                          onClick={resetGame}
+                          className="px-3 py-1 bg-slate-50 hover:bg-rose-50 hover:text-rose-500 rounded-lg text-[10px] font-black text-slate-400 transition-all uppercase tracking-widest"
+                        >
+                          重置紀錄
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2">
+                        {Array.from({ length: 20 }).map((_, i) => (
+                          <div 
+                            key={i}
+                            className={`aspect-square rounded-xl flex items-center justify-center text-xs font-black transition-all duration-500 ${
+                              history.includes(i + 1)
+                                ? 'bg-emerald-500 text-white shadow-md scale-105'
+                                : 'bg-slate-50 text-slate-200 border border-slate-100'
+                            }`}
+                          >
+                            {i + 1}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-6 flex items-center justify-between">
+                        <div className="h-2 flex-grow bg-slate-100 rounded-full overflow-hidden mr-4">
+                          <div 
+                            className="h-full bg-emerald-500 transition-all duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.5)]" 
+                            style={{ width: `${(history.length / 20) * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-black text-emerald-600">{history.length}/20</span>
+                      </div>
+                    </div>
+                    
+                    {/* SOS 小撇步 */}
+                    <div className="bg-[#2D3436] rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden group">
+                      <div className="absolute -right-4 -bottom-4 text-white opacity-5 transform group-hover:scale-110 transition-transform duration-700">
+                        <Icon name="Star" className="w-32 h-32" color="white" />
+                      </div>
+                      <h4 className="font-black text-rose-400 mb-4 flex items-center gap-2 tracking-wider uppercase">
+                        💡 應對小撇步 (SOS)
+                      </h4>
+                      <ul className="space-y-4 relative z-10">
+                        <li className="flex gap-4">
+                          <div className="w-8 h-8 rounded-lg bg-rose-500 flex-shrink-0 flex items-center justify-center font-black text-white shadow-sm">S</div> 
+                          <div><span className="font-black block text-sm">Stop 停下來</span><span className="text-xs text-slate-400">深呼吸三次，冷靜思考再開口。</span></div>
+                        </li>
+                        <li className="flex gap-4">
+                          <div className="w-8 h-8 rounded-lg bg-amber-500 flex-shrink-0 flex items-center justify-center font-black text-white shadow-sm">O</div> 
+                          <div><span className="font-black block text-sm">Observe 觀察</span><span className="text-xs text-slate-400">看對方的表情，想一想他在想什麼？</span></div>
+                        </li>
+                        <li className="flex gap-4">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500 flex-shrink-0 flex items-center justify-center font-black text-white shadow-sm">S</div> 
+                          <div><span className="font-black block text-sm">Speak 說感受</span><span className="text-xs text-slate-400">用有禮貌的方式說出你的困難。</span></div>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 頁尾 */}
+                <footer className="mt-20 pb-10 border-t border-slate-100 pt-10 text-center">
+                  <div className="flex flex-col items-center gap-4">
+                    <span className="bg-slate-100 text-slate-400 px-6 py-2 rounded-2xl text-xs font-black tracking-widest uppercase">
+                      鏡如老師 編制
+                    </span>
+                    <p className="text-slate-400 text-xs leading-loose max-w-lg">
+                      本教材專為國中小社交技巧訓練設計。犀牛代表溫和易感的孩子，小西瓜代表直接衝動的孩子。<br/>
+                      透過角色對換討論，建立同理心與衝突解決能力。
+                    </p>
+                    <div className="flex gap-4 mt-2">
+                      <div className="w-2 h-2 rounded-full bg-rose-400"></div>
+                      <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                      <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
+                    </div>
+                  </div>
+                </footer>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
