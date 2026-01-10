@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>情緒調節小助手 - 停一下、深呼吸、安全手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f0f9ff;
+        }
+
+        .step-card {
+            display: none;
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .step-card.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 呼吸動畫 */
+        .breathing-circle {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #7dd3fc 0%, #0ea5e9 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(14, 165, 233, 0.4);
+            transition: transform 4s ease-in-out;
+        }
+
+        .inhale {
+            transform: scale(1.5);
+        }
+
+        .exhale {
+            transform: scale(1);
+        }
+
+        .pulse {
+            animation: pulse-animation 2s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* 握拳動畫提示 */
+        .hand-action {
+            animation: squeeze 2s infinite;
+        }
+
+        @keyframes squeeze {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(0.8); opacity: 0.7; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-sky-100">
+        <!-- 進度條 -->
+        <div class="bg-gray-100 h-3 flex">
+            <div id="progress-bar" class="bg-sky-500 h-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+
+        <div class="p-8">
+            <!-- 開始頁面 -->
+            <div id="step-0" class="step-card active flex-col items-center text-center">
+                <div class="w-24 h-24 bg-sky-100 rounded-full flex items-center justify-center mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-4">感覺有點生氣嗎？</h1>
+                <p class="text-gray-600 mb-8 leading-relaxed">沒關係，每個人都會有情緒。讓我們一起練習三個小撇步，讓心情平復下來吧！</p>
+                <button onclick="goToStep(1)" class="w-full py-4 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-2xl shadow-lg transition duration-200 transform hover:scale-105">
+                    準備好了，開始！
+                </button>
+            </div>
+
+            <!-- 第一步：停一下 -->
+            <div id="step-1" class="step-card flex-col items-center text-center">
+                <div class="w-32 h-32 bg-red-100 rounded-full flex items-center justify-center mb-6 pulse">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                </div>
+                <h2 class="text-4xl font-black text-red-600 mb-4">1. 停一下</h2>
+                <p class="text-xl text-gray-700 mb-8 font-medium">把雙手放開，身體站穩或坐好，<br>先不要說話，也不要亂動。</p>
+                <button onclick="goToStep(2)" class="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-2xl shadow-lg transition duration-200">
+                    我停下來了
+                </button>
+            </div>
+
+            <!-- 第二步：深呼吸 -->
+            <div id="step-2" class="step-card flex-col items-center text-center">
+                <h2 class="text-3xl font-bold text-sky-600 mb-8">2. 深呼吸</h2>
+                <div class="relative mb-12 flex items-center justify-center h-64">
+                    <div id="breathing-circle" class="breathing-circle">
+                        <span id="breathing-text">預備...</span>
+                    </div>
+                </div>
+                <p class="text-gray-600 mb-8">跟著圓圈的大小變化，<br>慢慢地吸氣、吐氣三次。</p>
+                <div id="breath-controls" class="w-full space-y-4">
+                    <button id="start-breath-btn" onclick="startBreathing()" class="w-full py-4 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-2xl shadow-lg transition duration-200">
+                        開始呼吸引導
+                    </button>
+                    <button id="next-from-breath" onclick="goToStep(3)" class="hidden w-full py-4 bg-sky-100 text-sky-700 font-bold rounded-2xl border-2 border-sky-300">
+                        心情平復了，下一步
+                    </button>
+                </div>
+            </div>
+
+            <!-- 第三步：安全手 -->
+            <div id="step-3" class="step-card flex-col items-center text-center">
+                <div class="flex space-x-4 mb-6">
+                    <div class="w-24 h-24 bg-green-100 rounded-2xl flex items-center justify-center hand-action">
+                        <span class="text-5xl">✊</span>
+                    </div>
+                    <div class="w-24 h-24 bg-green-100 rounded-2xl flex items-center justify-center" style="animation: squeeze 2s infinite 1s;">
+                        <span class="text-5xl">🖐️</span>
+                    </div>
+                </div>
+                <h2 class="text-3xl font-bold text-green-600 mb-4">3. 安全手</h2>
+                <p class="text-xl text-gray-700 mb-8 font-medium">把手放在安全的地方：<br>左右手輪流握拳再打開。</p>
+                <div class="grid grid-cols-1 gap-4 w-full mb-8">
+                    <div class="p-4 bg-green-50 rounded-xl border border-green-100 text-green-800">✊ 感覺肌肉用力，再慢慢鬆開</div>
+                    <div class="p-4 bg-green-50 rounded-xl border border-green-100 text-green-800">🖐️ 重複幾次，讓手冷靜下來</div>
+                </div>
+                <button onclick="goToStep(4)" class="w-full py-4 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl shadow-lg transition duration-200">
+                    我做到了，手很安全
+                </button>
+            </div>
+
+            <!-- 完成頁面 -->
+            <div id="step-4" class="step-card flex-col items-center text-center">
+                <div class="text-6xl mb-6">🎉</div>
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">做得太棒了！</h2>
+                <p class="text-gray-600 mb-8 leading-relaxed">你成功掌控了自己的情緒。<br>現在，你可以試著用<strong>「好好的話」</strong>告訴老師或同學你的感覺嗎？</p>
+                <div class="w-full p-4 bg-yellow-50 rounded-2xl border-2 border-yellow-200 text-yellow-800 mb-8 italic">
+                    「我覺得... 因為... 我希望...」
+                </div>
+                <button onclick="resetApp()" class="w-full py-4 bg-gray-800 hover:bg-black text-white font-bold rounded-2xl shadow-lg transition duration-200">
+                    重新開始
+                </button>
+            </div>
+        </div>
+
+        <!-- 底部提示 -->
+        <div id="footer-hint" class="px-8 pb-6 text-center text-sm text-gray-400">
+            情緒小主人練習中
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 0;
+        const totalSteps = 4;
+
+        function goToStep(step) {
+            // 隱藏當前步驟
+            document.getElementById(`step-${currentStep}`).classList.remove('active');
+            
+            // 顯示新步驟
+            currentStep = step;
+            const nextStepEl = document.getElementById(`step-${currentStep}`);
+            nextStepEl.classList.add('active');
+
+            // 更新進度條
+            const progress = (currentStep / totalSteps) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+
+            // 如果進入呼吸步驟，重置按鈕
+            if (step === 2) {
+                document.getElementById('start-breath-btn').classList.remove('hidden');
+                document.getElementById('next-from-breath').classList.add('hidden');
+                document.getElementById('breathing-text').innerText = "預備...";
+                document.getElementById('breathing-circle').classList.remove('inhale');
+            }
+        }
+
+        function startBreathing() {
+            const circle = document.getElementById('breathing-circle');
+            const text = document.getElementById('breathing-text');
+            const startBtn = document.getElementById('start-breath-btn');
+            const nextBtn = document.getElementById('next-from-breath');
+            
+            startBtn.classList.add('hidden');
+            let cycle = 0;
+            const maxCycles = 3;
+
+            function runBreathCycle() {
+                if (cycle < maxCycles) {
+                    // 吸氣
+                    text.innerText = "慢慢吸氣...";
+                    circle.classList.add('inhale');
+                    
+                    setTimeout(() => {
+                        // 吐氣
+                        text.innerText = "慢慢吐氣...";
+                        circle.classList.remove('inhale');
+                        
+                        setTimeout(() => {
+                            cycle++;
+                            runBreathCycle();
+                        }, 4000);
+                    }, 4000);
+                } else {
+                    text.innerText = "感覺好多了！";
+                    nextBtn.classList.remove('hidden');
+                }
+            }
+
+            runBreathCycle();
+        }
+
+        function resetApp() {
+            goToStep(0);
+        }
+
+        // 監聽鍵盤空白鍵也可以下一步
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && currentStep === 1) {
+                goToStep(2);
+            }
+        });
+    </script>
+</body>
+</html>
